@@ -278,28 +278,58 @@ docker compose -f infrastructure/docker/docker-compose.infra.yml up
 
 This spins up: PostgreSQL, Kafka, Redis, Elasticsearch, Prometheus, Grafana, and WireMock (payment stubs).
 
-### Kubernetes
+### Kubernetes (local — Docker Desktop)
 
-Deployments use **Kustomize** with environment overlays:
+Plain `kubectl` manifests that bring up the full stack (all backing infra + 10
+services + an nginx load balancer) on Docker Desktop's built-in Kubernetes.
 
-```
-infrastructure/k8s/
-├── base/                        # shared base manifests
-└── overlays/
-    ├── dev/
-    ├── staging/
-    └── prod/
-```
+**Requirements (install / enable these first):**
 
-Apply an environment:
+| Requirement | Notes |
+|---|---|
+| **Docker Desktop** | With **Kubernetes enabled** (Settings → Kubernetes → *Enable Kubernetes*, wait until green). Provides both the Docker daemon for builds and a single-node cluster. |
+| **kubectl** | Bundled with Docker Desktop. Point it at the cluster: `kubectl config use-context docker-desktop`. |
+| **bash** | To run the `*.sh` scripts. On Windows use **Git Bash** or **WSL** (these are bash, not PowerShell). |
+| **Docker Desktop memory ≈ 8 GB** | Settings → Resources → Memory. 10 JVMs + Elasticsearch + Kafka is heavy; less will crash-loop. |
+| **Internet (first build only)** | The image build pulls base images and downloads Gradle dependencies. |
+
+> No local Java, Gradle, Postgres, Redis, Kafka, or Elasticsearch needed — the
+> jars build inside a container and all backing services run as pods.
+
+**Verify prerequisites:**
 ```bash
-kubectl apply -k infrastructure/k8s/overlays/dev
+docker version          # daemon responds
+kubectl get nodes       # docker-desktop node is Ready
 ```
 
-**Helm** (umbrella chart with per-service subcharts):
-```bash
-helm upgrade --install ticket-booking infrastructure/helm/ticket-booking/ -f values.dev.yaml
+**Manifest layout:**
 ```
+infrastructure/
+├── docker/Dockerfile      # generic multi-stage build, param'd by SERVICE
+├── build-images.sh        # builds ticketbooking/<svc>:local for all 10 services
+├── deploy.sh              # applies manifests in order, waits for infra
+├── teardown.sh            # kubectl delete namespace ticketing
+└── k8s/
+    ├── 00-namespace-config.yaml   # namespace + shared ConfigMap + Secret
+    ├── 10-postgres.yaml           # 1 Postgres, auto-creates 7 DBs
+    ├── 11-redis.yaml              # seat locks
+    ├── 12-kafka.yaml              # single-node KRaft (no ZooKeeper)
+    ├── 13-elasticsearch.yaml      # single-node, security off
+    ├── 14-mailhog.yaml            # SMTP sink + web UI
+    ├── 20-services.yaml           # all 10 Spring services (Deployment + Service)
+    └── 30-nginx.yaml              # nginx LB → routes /api/* to each service
+```
+
+**Deploy:**
+```bash
+cd infrastructure
+./build-images.sh          # builds all 10 images into the local Docker daemon
+./deploy.sh                # creates ns, waits for infra, then deploys apps + nginx
+kubectl -n ticketing get pods -w
+```
+
+Once `nginx-lb` is Ready, the API is on **http://localhost** (e.g.
+`/api/users`, `/api/events`, `/api/bookings`). Tear down with `./teardown.sh`.
 
 ### CI/CD
 

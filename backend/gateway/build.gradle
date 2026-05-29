@@ -4,9 +4,11 @@ plugins {
 
 dependencies {
     implementation project(':common-platform')
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    // Servlet (MVC) gateway needs the servlet web stack, not webflux.
+    implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.springframework.cloud:spring-cloud-starter-gateway-mvc'
+    // Renamed in Spring Cloud 2025.1.x / Gateway 5.0 (was spring-cloud-starter-gateway-mvc).
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway-server-webmvc'
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

@@ -1,0 +1,14 @@
+# syntax=docker/dockerfile:1
+# Runtime image for a single service. Does NOT run Gradle — it just copies the
+# already-built jar out of the shared builder image, so each one takes seconds.
+ARG BUILDER=ticketbooking/builder:local
+FROM ${BUILDER} AS build
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+ARG SERVICE
+ENV JAVA_OPTS=""
+# bootJar emits <name>-<version>.jar plus a *-plain.jar we must skip.
+COPY --from=build /workspace/${SERVICE}/build/libs/ /tmp/libs/
+RUN cp "$(ls /tmp/libs/*.jar | grep -v plain | head -n1)" /app/app.jar && rm -rf /tmp/libs
+ENTRYPOINT ["sh","-c","exec java $JAVA_OPTS -jar /app/app.jar"]

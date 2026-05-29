@@ -25,9 +25,11 @@ public class SeatStatusBroadcaster {
     }
 
     private void broadcast(UUID eventId, UUID seatId, String state) {
+        // Cast payload to Object so the compiler picks convertAndSend(destination, payload)
+        // rather than the ambiguous convertAndSend(payload, headers) overload.
         messagingTemplate.convertAndSend(
                 "/topic/events/" + eventId + "/seats",
-                Map.of("seatId", seatId, "state", state)
+                (Object) Map.of("seatId", seatId, "state", state)
         );
     }
 }

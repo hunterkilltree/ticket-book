@@ -1,0 +1,122 @@
+# nginx as the single entry point / load balancer.
+# Routes each /api/* prefix straight to the owning microservice (bypassing the Spring gateway).
+# Exposed as a LoadBalancer Service -> reachable on http://localhost  with Docker Desktop.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: ticketing
+data:
+  nginx.conf: |
+    worker_processes auto;
+    events { worker_connections 1024; }
+    http {
+      # k8s DNS resolver so upstream names re-resolve if pods restart.
+      resolver kube-dns.kube-system.svc.cluster.local valid=10s ipv6=off;
+
+      # WebSocket upgrade plumbing (booking-service seat map).
+      map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+      }
+
+      upstream user_svc    { server user-service.ticketing.svc.cluster.local:8081; }
+      upstream event_svc   { server event-service.ticketing.svc.cluster.local:8082; }
+      upstream search_svc  { server search-service.ticketing.svc.cluster.local:8083; }
+      upstream booking_svc { server booking-service.ticketing.svc.cluster.local:8084; }
+      upstream order_svc   { server order-service.ticketing.svc.cluster.local:8085; }
+      upstream payment_svc { server payment-service.ticketing.svc.cluster.local:8086; }
+      upstream ticket_svc  { server ticket-service.ticketing.svc.cluster.local:8087; }
+      upstream admin_svc   { server admin-service.ticketing.svc.cluster.local:8089; }
+      upstream gateway_svc { server gateway.ticketing.svc.cluster.local:8080; }
+
+      server {
+        listen 80;
+        server_name _;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout    60s;
+
+        location = /healthz { return 200 'ok'; add_header Content-Type text/plain; }
+
+        location /api/users/    { proxy_pass http://user_svc;    }
+        location /api/events/   { proxy_pass http://event_svc;   }
+        location /api/search/   { proxy_pass http://search_svc;  }
+        location /api/orders/   { proxy_pass http://order_svc;   }
+        location /api/payments/ { proxy_pass http://payment_svc; }
+        location /api/tickets/  { proxy_pass http://ticket_svc;  }
+        location /api/admin/    { proxy_pass http://admin_svc;   }
+
+        # booking-service serves REST + STOMP/WebSocket seat updates.
+        location /api/bookings/ {
+          proxy_pass http://booking_svc;
+          proxy_set_header Upgrade    $http_upgrade;
+          proxy_set_header Connection $connection_upgrade;
+        }
+        location /ws {
+          proxy_pass http://booking_svc;
+          proxy_set_header Upgrade    $http_upgrade;
+          proxy_set_header Connection $connection_upgrade;
+          proxy_read_timeout 3600s;
+        }
+
+        # Fallback to the Spring gateway for anything else.
+        location / { proxy_pass http://gateway_svc; }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-lb
+  namespace: ticketing
+  labels:
+    app: nginx-lb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-lb
+  template:
+    metadata:
+      labels:
+        app: nginx-lb
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: conf
+          configMap:
+            name: nginx-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-lb
+  namespace: ticketing
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-lb
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

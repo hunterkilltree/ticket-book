@@ -25,6 +25,9 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:4.0.6"
+            // Supplies versions for Spring Cloud starters (e.g. gateway-mvc).
+            // 2025.1.x (Oakwood) is the release train aligned with Spring Boot 4.0.x.
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:2025.1.1"
         }
     }
 

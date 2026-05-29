@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ticketing
+---
+# Shared non-secret config injected into every service via envFrom.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ticket-config
+  namespace: ticketing
+data:
+  KAFKA_BROKERS: "kafka:9092"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  ELASTICSEARCH_URI: "http://elasticsearch:9200"
+  MAIL_HOST: "mailhog"
+  MAIL_PORT: "1025"
+  DB_USER: "postgres"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ticket-secret
+  namespace: ticketing
+type: Opaque
+stringData:
+  DB_PASSWORD: "postgres"

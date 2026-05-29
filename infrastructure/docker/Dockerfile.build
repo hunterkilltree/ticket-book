@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+# Builder image: compiles EVERY service's bootJar in a single Gradle pass.
+#
+# Why this exists:
+#  - One pass instead of 10 -> Gradle + dependencies download once, shared code
+#    (common-platform) compiles once.
+#  - --continue makes Gradle attempt every module and report ALL compile errors
+#    together, so you fix them in one round instead of one-per-rebuild.
+#  - The BuildKit cache mount persists the Gradle home (wrapper dist + downloaded
+#    dependencies) across rebuilds, so a re-run after a code fix is much faster
+#    and never re-downloads.
+FROM eclipse-temurin:21-jdk AS build
+WORKDIR /workspace
+COPY . .
+RUN --mount=type=cache,target=/root/.gradle \
+    chmod +x gradlew && \
+    ./gradlew bootJar -x test --no-daemon --continue
