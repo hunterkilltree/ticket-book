@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-service
+  namespace: ticketing
+  labels:
+    app: booking-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: booking-service
+  template:
+    metadata:
+      labels:
+        app: booking-service
+    spec:
+      containers:
+        - name: booking-service
+          image: ticketbooking/booking-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          envFrom:
+            - configMapRef:
+                name: ticket-config
+            - secretRef:
+                name: ticket-secret
+          env:
+            - name: DB_URL
+              value: "jdbc:postgresql://postgres:5432/bookingdb"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              memory: "768Mi"
+          startupProbe:
+            tcpSocket:
+              port: 8084
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 8084
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8084
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-service
+  namespace: ticketing
+spec:
+  selector:
+    app: booking-service
+  ports:
+    - port: 8084
+      targetPort: 8084

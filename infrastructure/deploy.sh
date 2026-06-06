@@ -29,7 +29,9 @@ kubectl -n "$NS" rollout status deploy/elasticsearch --timeout=240s
 kubectl -n "$NS" rollout status deploy/mailhog       --timeout=120s
 
 echo "==> Application services"
-kubectl apply -f "$K8S_DIR/20-services.yaml"
+for f in "$K8S_DIR"/2[0-9]-*.yaml; do
+  kubectl apply -f "$f"
+done
 
 echo "==> nginx load balancer"
 kubectl apply -f "$K8S_DIR/30-nginx.yaml"

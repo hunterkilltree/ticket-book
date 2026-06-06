@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service
+  namespace: ticketing
+  labels:
+    app: event-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: event-service
+  template:
+    metadata:
+      labels:
+        app: event-service
+    spec:
+      containers:
+        - name: event-service
+          image: ticketbooking/event-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: ticket-config
+            - secretRef:
+                name: ticket-secret
+          env:
+            - name: DB_URL
+              value: "jdbc:postgresql://postgres:5432/eventdb"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              memory: "768Mi"
+          startupProbe:
+            tcpSocket:
+              port: 8082
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8082
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-service
+  namespace: ticketing
+spec:
+  selector:
+    app: event-service
+  ports:
+    - port: 8082
+      targetPort: 8082
