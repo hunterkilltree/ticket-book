@@ -33,11 +33,15 @@ for f in "$K8S_DIR"/2[0-9]-*.yaml; do
   kubectl apply -f "$f"
 done
 
+echo "==> Frontend SPA"
+kubectl apply -f "$K8S_DIR/40-frontend.yaml"
+
+# nginx resolves upstream hostnames at startup, so services + frontend must exist first.
 echo "==> nginx load balancer"
 kubectl apply -f "$K8S_DIR/30-nginx.yaml"
 
 echo "==> Done. Watch pods come up with:"
 echo "    kubectl -n $NS get pods -w"
 echo
-echo "Once nginx-lb is Ready, the API is at:  http://localhost/api/..."
+echo "Once nginx-lb is Ready:  app UI at http://localhost   |   API at http://localhost/api/..."
 echo "MailHog UI:  kubectl -n $NS port-forward svc/mailhog 8025:8025  ->  http://localhost:8025"

@@ -1,0 +1,4 @@
+ALTER TABLE tickets
+    ADD COLUMN user_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+
+CREATE INDEX idx_tickets_user_id ON tickets(user_id);

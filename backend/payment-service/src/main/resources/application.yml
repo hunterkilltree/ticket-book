@@ -13,6 +13,9 @@ spring:
     enabled: true
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 payment:
   gateway:

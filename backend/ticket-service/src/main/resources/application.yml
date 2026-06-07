@@ -13,6 +13,14 @@ spring:
     enabled: true
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    consumer:
+      group-id: ticket-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}

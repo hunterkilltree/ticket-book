@@ -26,3 +26,4 @@ metadata:
 type: Opaque
 stringData:
   DB_PASSWORD: "postgres"
+  JWT_SECRET: "local-dev-jwt-secret-change-me-at-least-32-bytes"

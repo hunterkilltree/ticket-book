@@ -375,12 +375,24 @@ npm run dev
 
 ### Environment Variables
 
-Each backend service has:
-- `application.yml` — shared defaults
-- `application-local.yml` — local dev overrides
-- `application-staging.yml` — staging overrides
+All configurable variables (and which are secrets) are documented in **[`.env.example`](.env.example)**.
+Copy it to a local `.env` and fill in real values:
 
-Frontend environment files: `.env.development`, `.env.staging`
+```bash
+cp .env.example .env
+```
+
+`.env` is gitignored — never commit real secrets. Where each value is actually consumed:
+
+| Scope | Source |
+|---|---|
+| Local Kubernetes | shared values in the `ticket-config` ConfigMap + `ticket-secret` Secret (`infrastructure/k8s/00-namespace-config.yaml`) — change the secret values there for real deployments |
+| Service from IDE / `./gradlew bootRun` | exported env vars (the `.env` values) |
+| Frontend | the `VITE_*` vars go in `frontend/.env` (Vite only reads that) |
+| CI / code quality | `SONAR_TOKEN` is a GitHub Actions secret — see [`docs/sonarcloud-setup.md`](docs/sonarcloud-setup.md) |
+
+**Secrets to set** (🔐): `JWT_SECRET`, `DB_PASSWORD`, and `SONAR_TOKEN`. Per-service backend defaults
+also live in each service's `application.yml`.
 
 ---
 

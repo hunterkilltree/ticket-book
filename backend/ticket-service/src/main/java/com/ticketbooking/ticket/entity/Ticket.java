@@ -20,6 +20,9 @@ public class Ticket extends AuditableEntity {
     private UUID orderId;
 
     @Column(nullable = false)
+    private UUID userId;
+
+    @Column(nullable = false)
     private UUID seatId;
 
     @Column(nullable = false, unique = true)

@@ -25,3 +25,7 @@ management:
 
 server:
   port: 8081
+
+jwt:
+  secret: ${JWT_SECRET:dev-secret-change-me-please-at-least-32-bytes}
+  ttl-seconds: ${JWT_TTL_SECONDS:86400}

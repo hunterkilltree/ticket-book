@@ -6,6 +6,7 @@ when Claude works in that subtree:
 
 - **`backend/CLAUDE.md`** — Spring Boot conventions, module & package layout, service internals.
 - **`infrastructure/CLAUDE.md`** — local Kubernetes setup, build model, known issues & fixes.
+- **`docs/implementation-log.md`** — feature implementation progress and the **next step to build**. Read this first when continuing feature work.
 
 Read the relevant nested file before changing code in that area.
 

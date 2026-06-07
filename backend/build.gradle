@@ -1,6 +1,9 @@
 plugins {
     id 'org.springframework.boot' version '4.0.6' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
+    // SonarScanner for Gradle (SonarQube Cloud). Bump to the latest release if Gradle 9
+    // compatibility requires it: https://plugins.gradle.org/plugin/org.sonarqube
+    id 'org.sonarqube' version '5.1.0.4882'
 }
 
 allprojects {
@@ -8,9 +11,21 @@ allprojects {
     version = '0.0.1-SNAPSHOT'
 }
 
+// --- SonarQube Cloud (https://sonarcloud.io) ---
+// Replace the two REPLACE_ME values with your SonarCloud project key & organization
+// (or pass them on the CI command line with -Dsonar.projectKey=... -Dsonar.organization=...).
+sonar {
+    properties {
+        property 'sonar.projectKey', 'REPLACE_ME_project-key'
+        property 'sonar.organization', 'REPLACE_ME_organization'
+        property 'sonar.host.url', 'https://sonarcloud.io'
+    }
+}
+
 subprojects {
     apply plugin: 'java'
     apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'jacoco'
 
     java {
         toolchain {
@@ -41,5 +56,14 @@ subprojects {
 
     tasks.named('test') {
         useJUnitPlatform()
+        finalizedBy tasks.named('jacocoTestReport')
+    }
+
+    // JaCoCo XML report is what SonarQube Cloud reads for coverage.
+    tasks.named('jacocoTestReport') {
+        dependsOn tasks.named('test')
+        reports {
+            xml.required = true
+        }
     }
 }

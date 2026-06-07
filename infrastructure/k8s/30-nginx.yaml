@@ -29,6 +29,7 @@ data:
       upstream ticket_svc  { server ticket-service.ticketing.svc.cluster.local:8087; }
       upstream admin_svc   { server admin-service.ticketing.svc.cluster.local:8089; }
       upstream gateway_svc { server gateway.ticketing.svc.cluster.local:8080; }
+      upstream frontend_svc { server frontend.ticketing.svc.cluster.local:80; }
 
       server {
         listen 80;
@@ -44,16 +45,18 @@ data:
 
         location = /healthz { return 200 'ok'; add_header Content-Type text/plain; }
 
-        location /api/users/    { proxy_pass http://user_svc;    }
-        location /api/events/   { proxy_pass http://event_svc;   }
-        location /api/search/   { proxy_pass http://search_svc;  }
-        location /api/orders/   { proxy_pass http://order_svc;   }
-        location /api/payments/ { proxy_pass http://payment_svc; }
-        location /api/tickets/  { proxy_pass http://ticket_svc;  }
-        location /api/admin/    { proxy_pass http://admin_svc;   }
+        # Prefix (no trailing slash) so both /api/events and /api/events/123 match.
+        location /api/users    { proxy_pass http://user_svc;    }
+        location /api/events   { proxy_pass http://event_svc;   }
+        location /api/venues   { proxy_pass http://event_svc;   }
+        location /api/search   { proxy_pass http://search_svc;  }
+        location /api/orders   { proxy_pass http://order_svc;   }
+        location /api/payments { proxy_pass http://payment_svc; }
+        location /api/tickets  { proxy_pass http://ticket_svc;  }
+        location /api/admin    { proxy_pass http://admin_svc;   }
 
         # booking-service serves REST + STOMP/WebSocket seat updates.
-        location /api/bookings/ {
+        location /api/bookings {
           proxy_pass http://booking_svc;
           proxy_set_header Upgrade    $http_upgrade;
           proxy_set_header Connection $connection_upgrade;
@@ -65,8 +68,8 @@ data:
           proxy_read_timeout 3600s;
         }
 
-        # Fallback to the Spring gateway for anything else.
-        location / { proxy_pass http://gateway_svc; }
+        # Everything else serves the frontend SPA (which does its own client-side routing).
+        location / { proxy_pass http://frontend_svc; }
       }
     }
 ---

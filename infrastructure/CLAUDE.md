@@ -19,7 +19,8 @@ infrastructure/
     ├── 10-postgres.yaml          # 1 Postgres, init.sql creates 7 DBs
     ├── 11-redis / 12-kafka (KRaft) / 13-elasticsearch / 14-mailhog
     ├── 20..29-<service>.yaml      # one file per Spring service (Deployment + Service)
-    └── 30-nginx.yaml             # nginx LB (type: LoadBalancer) routes /api/* to services
+    ├── 30-nginx.yaml             # nginx LB (type: LoadBalancer): / -> frontend SPA, /api/* -> services
+    └── 40-frontend.yaml          # frontend SPA (Vite build served by nginx)
 ```
 
 Reusable workflows are slash commands in `.claude/commands/`: `/start-local`,
@@ -104,6 +105,13 @@ Still open / watch for:
 
 Newest first. Keep appending here so the next session knows the current state.
 
+- **Frontend scaffolded + wired into the cluster.** `frontend/` is a Vite + React + TS
+  foundation (see `frontend/CLAUDE.md`). Containerized via `frontend/Dockerfile` ->
+  `ticketbooking/frontend:local`; deployed by `k8s/40-frontend.yaml`. The cluster nginx now
+  routes `/` to the frontend Service (kept `/api/*` + `/ws` to backend). `build-images.sh`
+  builds the frontend image (and `./build-images.sh frontend` builds it alone); `deploy.sh`
+  applies `40-frontend.yaml` before nginx. Dev loop: `cd frontend && npm install && npm run dev`
+  (proxies to http://localhost). Feature screens are still stubs.
 - **Manifests split per service.** `k8s/20-services.yaml` was broken into one file per
   service: `20-user-service.yaml` … `28-admin-service.yaml`, `29-gateway.yaml` (each holds
   that service's Deployment + Service). `deploy.sh` now applies them via the
