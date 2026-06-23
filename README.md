@@ -345,32 +345,49 @@ GitHub Actions workflows (`.github/workflows/`) handle:
 
 ### Prerequisites
 
-- Java 25
-- Node.js 20+
-- Docker & Docker Compose
-- Kubernetes CLI (`kubectl`) + Helm (for cluster deployments)
+- **Docker Desktop** (includes Compose) — all you need for the one-command run below.
+- **Git Bash or WSL** on Windows (the scripts are bash, not PowerShell).
+- ~**8 GB** free for Docker (10 JVMs + Elasticsearch + Kafka).
+- _Optional, for developing outside containers:_ Java 21 + Node.js 20+.
 
-### First-time Setup
+### Run it — one command (Docker Compose)
 
 ```bash
-# Clone the repo
-git clone <repo-url>
-cd ticket-booking
+git clone <repo-url> && cd ticket-book
 
-# Run the bootstrap script (installs tooling, creates Kafka topics, seeds DB)
-./scripts/bootstrap.sh
+./start.sh        # builds all images, then `docker compose up -d` for the whole stack
+```
 
-# Start infrastructure
-docker compose -f infrastructure/docker/docker-compose.infra.yml up -d
+`start.sh` brings up Postgres, Redis, Kafka, Elasticsearch, MailHog, the 10 services, the frontend
+SPA, and the nginx edge. The first run downloads dependencies (slow); later runs are cached. Give the
+containers a minute to become healthy, then open:
 
-# Build all backend services
-cd backend
-./gradlew build
+- **App UI:** http://localhost
+- **API:** http://localhost/api/...
+- **MailHog (sent emails):** http://localhost:8025
 
-# Start frontend
-cd ../frontend
-npm install
-npm run dev
+Log in with a seeded demo account — see [Demo data & accounts](#demo-data--accounts).
+
+### Stop / free resources
+
+```bash
+./stop.sh         # stop & remove containers + network, KEEP the database volume (fast restart)
+./stop.sh --all   # also wipe the DB volume + remove built images (frees the most disk)
+```
+
+While it runs: `docker compose ps`, `docker compose logs -f <service>`.
+
+> Prefer **Kubernetes**? Use the cluster path instead — see [Infrastructure → Kubernetes](#kubernetes-local--docker-desktop)
+> (`infrastructure/build-images.sh` + `infrastructure/deploy.sh`).
+
+### Develop outside containers (optional)
+
+```bash
+# Backend — run one service locally (keep the infra containers up)
+cd backend && ./gradlew :booking-service:bootRun
+
+# Frontend — hot-reload dev server, proxies /api + /ws to the running stack
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
 ### Environment Variables
@@ -393,6 +410,21 @@ cp .env.example .env
 
 **Secrets to set** (🔐): `JWT_SECRET`, `DB_PASSWORD`, and `SONAR_TOKEN`. Per-service backend defaults
 also live in each service's `application.yml`.
+
+### Demo data & accounts
+
+Seeded automatically on startup so you can test immediately:
+
+- **Sample events** — `event-service` seeds venues + published concerts (browse at `http://localhost/events`).
+- **Demo logins** — created by an idempotent startup seeder in `user-service`:
+
+| Email | Password | Role |
+|---|---|---|
+| `customer@demo.local` | `Password123!` | CUSTOMER |
+| `admin@demo.local` | `Password123!` | ADMIN (sees the Admin page) |
+
+Manual test flow: log in → **Browse** → open an event → **Pick seats** → reserve → **Proceed to checkout**
+→ **Pay** → **My Tickets**. Confirmation emails land in MailHog at `http://localhost:8025`.
 
 ---
 

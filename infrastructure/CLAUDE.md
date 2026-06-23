@@ -82,6 +82,15 @@ Fixes already applied (keep them):
   Gateway 5.0) and `spring-boot-starter-web` instead of `webflux`.
 - **Ambiguous `convertAndSend`** — `SeatStatusBroadcaster` casts the Map payload to
   `(Object)` so the compiler picks `convertAndSend(destination, payload)`.
+- **Jackson on notification-service** — it uses Jackson 2's `com.fasterxml...ObjectMapper` but has no
+  `spring-data-jpa` (which transitively provides Jackson 2 in the other services). Spring Boot 4's
+  `spring-boot-starter-json` ships **Jackson 3** (`tools.jackson`), so that didn't help — the fix is an
+  explicit `implementation 'com.fasterxml.jackson.core:jackson-databind'` in `notification-service/build.gradle`.
+- **Flyway on Postgres (Boot 4 / Flyway 11)** — Flyway split DB support into modules, so `flyway-core`
+  alone runs no migrations on Postgres → `ddl-auto: validate` then fails with "missing table". Added
+  `runtimeOnly 'org.flywaydb:flyway-database-postgresql'` to every DB-backed service's `build.gradle`.
+- **Frontend tsconfig** — removed the `tsconfig.node.json` project reference (caused TS6310) and added
+  `@types/node`; build uses `tsc --noEmit && vite build`.
 
 Still open / watch for:
 - **admin-service** has Flyway + JPA `ddl-auto: validate` but **no migration**.
