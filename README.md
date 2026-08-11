@@ -524,6 +524,110 @@ Grafana dashboards are pre-provisioned under `infrastructure/docker/grafana/`.
 
 ---
 
+## High Availability (99.9% Uptime)
+
+99.9% uptime allows **≤ 8.7 hours of downtime per year (≈ 43 minutes/month)**. The
+strategies below are grouped by layer and tied directly to the tech in this stack.
+
+---
+
+### 1. Kubernetes — redundancy and safe deploys
+
+| Practice | How |
+|---|---|
+| **Multiple replicas per service** | Set `replicas: ≥ 2` for all 10 services in `k8s/20-services.yaml`. For booking-service (most critical), use ≥ 3. |
+| **Rolling updates, not big-bang** | Default `RollingUpdate` strategy with `maxUnavailable: 0` and `maxSurge: 1` so old pods stay alive until new ones are ready. |
+| **Readiness & liveness probes** | Point both at Spring Boot Actuator: `GET /actuator/health` (liveness) and `GET /actuator/health/readiness` (readiness). Kubernetes will not route traffic to a pod that fails readiness. |
+| **PodDisruptionBudgets** | Add a PDB per service (e.g., `minAvailable: 1`) so node drains during cluster maintenance never take a service fully offline. |
+| **Resource limits** | Set CPU/memory `requests` and `limits` to prevent one noisy service from starving others. |
+
+---
+
+### 2. PostgreSQL — resilient data layer
+
+| Practice | How |
+|---|---|
+| **Read replica** | Provision a streaming replica; route read-heavy services (event-service, search-service fallback) to it. |
+| **Connection pooling** | Each Spring Boot service uses HikariCP (default). Tune `maximumPoolSize` per service load; avoid exhausting DB connections under flash-sale bursts. |
+| **Backward-compatible migrations** | Flyway scripts must be additive — never drop or rename a column in the same deploy that removes the code that uses it. Use a two-phase approach (add → deploy → clean up). |
+| **Regular backups + tested restores** | Automate pg_dump to object storage. Restore drills matter more than the backup schedule. |
+
+---
+
+### 3. Redis — seat lock resilience
+
+Seat locks are the single most availability-critical component; a Redis outage loses all in-flight reservations.
+
+| Practice | How |
+|---|---|
+| **Redis Sentinel or Cluster** | Replace the single-node Redis pod with a Sentinel setup (1 primary + 2 replicas + 3 sentinels) or Redis Cluster. Spring Data Redis handles failover automatically. |
+| **Persistence** | Enable both RDB snapshots and AOF (`appendonly yes`) so a restart doesn't lose active seat locks. |
+| **Lock TTL as a safety net** | `SeatReaperService` already handles expired locks — ensure TTLs are set on every `SETNX` call so a crash during reaper execution self-heals. |
+| **Circuit breaker around Redis** | If Redis is unreachable, fail-fast the reservation endpoint (return 503) rather than letting threads pile up waiting. |
+
+---
+
+### 4. Kafka — durable event streaming
+
+| Practice | How |
+|---|---|
+| **Replication factor ≥ 3** | All topics (`seat_reserved`, `payment_completed`, `ticket_issued`) should have `replication.factor=3` and `min.insync.replicas=2`. |
+| **Producer acks=all** | Set `acks=all` on Kafka producers so a message is only acknowledged after all in-sync replicas have written it. |
+| **Consumer idempotency** | Consumers already process at-least-once; ensure handlers are idempotent (check DB state before acting) so a redelivered event is a no-op. |
+| **Consumer lag alerting** | Alert when lag on any topic exceeds a threshold (e.g., > 1 000 messages). Runaway lag on `payment_completed` means tickets stop being issued. |
+| **Dead-letter topics** | Route messages that fail after N retries to a `*.dlq` topic and alert on non-zero DLQ size. |
+
+---
+
+### 5. Application — graceful degradation
+
+| Practice | How |
+|---|---|
+| **Graceful shutdown** | Set `spring.lifecycle.timeout-per-shutdown-phase=30s` so in-flight requests complete before the pod terminates. |
+| **Circuit breakers** | Add Resilience4j circuit breakers on downstream HTTP calls (e.g., payment-service → external gateway, booking-service → order-service). Open circuit returns 503 immediately instead of cascading timeouts. |
+| **Retries with backoff** | Use Resilience4j Retry or Spring's `RetryTemplate` for transient failures (DB connection blips, Kafka producer retries). Pair with exponential backoff + jitter. |
+| **Idempotency keys** | Order and payment endpoints already accept idempotency keys — ensure the client retries on 5xx (not 4xx) to tolerate transient failures without duplicate charges. |
+| **Timeouts everywhere** | Set explicit connect + read timeouts on all HTTP clients (RestClient, WebClient) and Kafka producers/consumers. Unbounded waits kill thread pools. |
+
+---
+
+### 6. Gateway — edge protection
+
+| Practice | How |
+|---|---|
+| **Rate limiting** | Already planned at the gateway — enforce per-user and per-IP limits to prevent a single actor from exhausting service capacity. |
+| **Health-check routing** | Gateway should route only to pods whose readiness probe is passing. Combine with Kubernetes Service's `readinessGates`. |
+| **Multiple gateway replicas** | Run ≥ 2 gateway pods; nginx (or cloud LB) distributes across them. A single gateway pod is a single point of failure. |
+
+---
+
+### 7. Observability — detect before users do
+
+| Signal | Target |
+|---|---|
+| **Uptime SLO dashboard** | Grafana panel tracking the rolling 30-day error rate against the 99.9% budget. Alert when burn rate exceeds 2× the budget. |
+| **P99 latency per service** | Alert when seat-selection P99 exceeds 200ms (the SLA target). |
+| **Payment success rate** | Alert when `payment_completed` / `payment_initiated` ratio drops below 0.95. |
+| **Pod restart rate** | Alert on any pod restarting more than twice in 5 minutes — early warning of crash-loops. |
+| **Kafka consumer lag** | Alert per topic when lag > 1 000 messages (see §4). |
+
+Grafana dashboards live in `infrastructure/docker/grafana/`. Add the above panels and wire alerts to your notification channel (PagerDuty, Slack, email).
+
+---
+
+### 8. Deployment checklist for each release
+
+Follow this before every production deploy to avoid self-inflicted downtime:
+
+1. Migration script reviewed for backward compatibility (no breaking DDL in same deploy).
+2. New service image passes all integration tests (Testcontainers suite green).
+3. Rolling update configured — `maxUnavailable: 0` confirmed in the manifest.
+4. Readiness probe verified to reflect real service health (not just "JVM started").
+5. Kafka consumer group offsets confirmed — no accidental `auto.offset.reset=earliest` on an existing topic.
+6. Rollback plan documented — know the previous image tag and the `kubectl rollout undo` command before you deploy.
+
+---
+
 ## Out of Scope
 
 - PCI compliance
