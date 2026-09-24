@@ -98,7 +98,7 @@ All topic names are constants in `com.ticketbooking.common.messaging.Topics`.
 - **Error handling**: throw `GeneralNotFoundException` / `UnauthorizedActionException` / `InvalidStateTransitionException`; `GlobalExceptionHandler` maps them to RFC 7807 `ProblemDetail`.
 - **Transactions**: `@Transactional` on all service write methods; read-only queries use `@Transactional(readOnly = true)`.
 - **Idempotency**: `order-service` and `payment-service` entities have an `idempotencyKey` unique column.
-- **Flyway**: every service with a DB has `resources/db/migration/V{n}__description.sql`. (admin-service currently lacks one — see infrastructure/CLAUDE.md.)
+- **Flyway**: every service with a DB has `resources/db/migration/V{n}__description.sql`.
 - **Config**: environment variables with local defaults, e.g. `${DB_URL:jdbc:postgresql://localhost:5432/userdb}`.
 - **Build config**: the root `build.gradle` imports both the Spring Boot BOM and the
   Spring Cloud BOM (`2025.1.1`). Spring Cloud starters (e.g. the gateway) rely on it for versions.

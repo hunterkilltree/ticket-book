@@ -3,7 +3,7 @@ package com.ticketbooking.admin;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.ticketbooking")
 public class AdminServiceApplication {
 
     public static void main(String[] args) {

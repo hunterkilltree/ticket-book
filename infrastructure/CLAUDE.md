@@ -93,9 +93,6 @@ Fixes already applied (keep them):
   `@types/node`; build uses `tsc --noEmit && vite build`.
 
 Still open / watch for:
-- **admin-service** has Flyway + JPA `ddl-auto: validate` but **no migration**.
-  If it has entities it will crash-loop on startup — add a `V1__*.sql` matching its
-  entities, or relax `ddl-auto`.
 - **search-service** has no migration (expected — Elasticsearch-backed, no DB).
 - **Gateway route config**: `application.yml` uses the old `spring.cloud.gateway.routes`
   namespace; Gateway 5.0 server-webmvc expects `spring.cloud.gateway.server.webmvc.*`.
